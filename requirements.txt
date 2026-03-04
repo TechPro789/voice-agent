@@ -1,0 +1,5 @@
+fastapi==0.135.1
+livekit==1.1.2
+livekit_api==1.1.0
+livekit_blingfire==1.1.0
+python-dotenv==1.2.2
