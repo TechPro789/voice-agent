@@ -1,276 +1,214 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>ABC Voice Agent — Mia</title>
-
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-font-family:'Segoe UI',sans-serif;
-background:#0f172a;
-color:white;
-display:flex;
-flex-direction:column;
-align-items:center;
-padding:40px 20px;
-min-height:100vh;
-}
-h2{font-size:26px;margin-bottom:6px}
-#subtitle{color:#64748b;font-size:14px;margin-bottom:28px}
-.btn-row{display:flex;gap:12px;margin-bottom:20px}
-
-button{
-padding:14px 36px;
-font-size:16px;
-cursor:pointer;
-border-radius:12px;
-border:none;
-font-weight:600;
-transition:opacity .2s
-}
-button:hover{opacity:.85}
-button:disabled{opacity:.4;cursor:not-allowed}
-
-#start{background:#22c55e;color:white}
-#stop{background:#ef4444;color:white;display:none}
-
-#status-bar{
-background:#1e293b;
-border-radius:10px;
-padding:10px 20px;
-font-size:14px;
-color:#94a3b8;
-margin-bottom:20px;
-min-width:320px;
-text-align:center
-}
-
-#chat{
-width:100%;
-max-width:560px;
-background:#1e293b;
-border-radius:14px;
-padding:20px;
-min-height:200px;
-max-height:440px;
-overflow-y:auto;
-display:flex;
-flex-direction:column;
-gap:10px
-}
-
-.msg{
-padding:10px 14px;
-border-radius:10px;
-font-size:14px;
-line-height:1.5;
-max-width:85%;
-word-wrap:break-word
-}
-
-.msg.agent{
-background:#334155;
-color:#e2e8f0;
-align-self:flex-start;
-border-bottom-left-radius:2px
-}
-
-.msg.user{
-background:#2563eb;
-color:white;
-align-self:flex-end;
-border-bottom-right-radius:2px
-}
-
-.msg .label{
-font-size:11px;
-opacity:.6;
-margin-bottom:4px;
-font-weight:600;
-text-transform:uppercase
-}
-
-#empty-chat{
-color:#475569;
-font-size:14px;
-text-align:center;
-margin:auto
-}
-</style>
+  <meta charset="UTF-8" />
+  <title>ABC Voice Agent — Mia</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f172a; color: white;
+      display: flex; flex-direction: column;
+      align-items: center; padding: 40px 20px; min-height: 100vh;
+    }
+    h2 { font-size: 26px; margin-bottom: 6px; }
+    #subtitle { color: #64748b; font-size: 14px; margin-bottom: 28px; }
+    .btn-row { display: flex; gap: 12px; margin-bottom: 20px; }
+    button {
+      padding: 14px 36px; font-size: 16px; cursor: pointer;
+      border-radius: 12px; border: none; font-weight: 600; transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #start { background: #22c55e; color: white; }
+    #stop  { background: #ef4444; color: white; display: none; }
+    #status-bar {
+      background: #1e293b; border-radius: 10px;
+      padding: 10px 20px; font-size: 14px; color: #94a3b8;
+      margin-bottom: 20px; min-width: 320px; text-align: center;
+    }
+    #chat {
+      width: 100%; max-width: 560px; background: #1e293b;
+      border-radius: 14px; padding: 20px;
+      min-height: 200px; max-height: 440px;
+      overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+    }
+    .msg {
+      padding: 10px 14px; border-radius: 10px;
+      font-size: 14px; line-height: 1.5; max-width: 85%; word-wrap: break-word;
+    }
+    .msg.agent { background: #334155; color: #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; }
+    .msg.user  { background: #2563eb; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .msg .label { font-size: 11px; opacity: 0.6; margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
+    #empty-chat { color: #475569; font-size: 14px; text-align: center; margin: auto; }
+  </style>
 </head>
-
 <body>
+  <h2>🎮 ABC Voice Agent</h2>
+  <p id="subtitle">Powered by Mia · ABC Games</p>
+  <div class="btn-row">
+    <button id="start" onclick="connectRoom()">📞 Start Call</button>
+    <button id="stop"  onclick="disconnectRoom()">🔴 End Call</button>
+  </div>
+  <div id="status-bar">⚪ Not connected</div>
+  <div id="chat"><div id="empty-chat">Start a call to begin the conversation</div></div>
 
-<h2>🎮 ABC Voice Agent</h2>
-<p id="subtitle">Powered by Mia · ABC Games</p>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js"></script>
+  <script>
+    const LIVEKIT_URL = "wss://ai-voice-agent-4nwoff2a.livekit.cloud";
+    const TOKEN_URL   = "http://localhost:8000/token";
 
-<div class="btn-row">
-<button id="start" onclick="connectRoom()">📞 Start Call</button>
-<button id="stop" onclick="disconnectRoom()">🔴 End Call</button>
-</div>
+    let room = null;
+    let audioElements = [];
 
-<div id="status-bar">⚪ Not connected</div>
-<div id="chat">
-<div id="empty-chat">Start a call to begin the conversation</div>
-</div>
+    // Dedup: track by segmentId + last content per speaker
+    const shownSegments = new Set();
+    const lastMessage = { agent: "", user: "" };
 
-<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js"></script>
+    function setStatus(msg) { document.getElementById("status-bar").textContent = msg; }
 
-<script>
+    function clearChat() {
+      document.getElementById("chat").innerHTML = '<div id="empty-chat">Start a call to begin the conversation</div>';
+      lastMessage.agent = "";
+      lastMessage.user  = "";
+      shownSegments.clear();
+    }
 
-const LIVEKIT_URL = "wss://ai-voice-agent-4nwoff2a.livekit.cloud";
-const TOKEN_URL = "/token";   // ✅ FIXED (no localhost)
+    function cleanupAudio() {
+      audioElements.forEach(el => { el.pause(); el.remove(); });
+      audioElements = [];
+    }
 
-let room = null;
-let audioElements = [];
+    function addMessage(who, text, segId) {
+      text = text.trim();
+      if (!text) return;
 
-const lastMessage = {agent:"",user:""};
+      // Skip if we already showed this segment ID
+      if (segId && shownSegments.has(segId)) return;
+      if (segId) shownSegments.add(segId);
 
-function setStatus(msg){
-document.getElementById("status-bar").textContent=msg;
-}
+      // Skip if exact same text just shown for this speaker (content dedup)
+      if (lastMessage[who] === text) return;
+      lastMessage[who] = text;
 
-function cleanupAudio(){
-audioElements.forEach(el=>{el.pause();el.remove()});
-audioElements=[];
-}
+      const chat = document.getElementById("chat");
+      const empty = document.getElementById("empty-chat");
+      if (empty) empty.remove();
 
-function clearChat(){
-document.getElementById("chat").innerHTML='<div id="empty-chat">Start a call to begin the conversation</div>';
-lastMessage.agent="";
-lastMessage.user="";
-}
+      const div = document.createElement("div");
+      div.className = "msg " + who;
+      div.innerHTML = `<div class="label">${who === "agent" ? "🤖 Mia" : "🎤 You"}</div>${text}`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
 
-function addMessage(who,text){
+    function handleTranscription(segments, participant) {
+      const isAgent = participant && (participant.isAgent || participant.identity !== "manager-test");
+      const who = isAgent ? "agent" : "user";
+      segments.forEach(seg => {
+        if (!seg.text || seg.text.trim() === "") return;
+        // ✅ Only show FINAL segments — ignore mid-stream partial updates
+        // Only show if final=true OR final is undefined (treat undefined as final)
+        if (seg.final === false) return;
+        addMessage(who, seg.text);
+      });
+    }
 
-text=text.trim();
-if(!text) return;
+    async function connectRoom() {
+      const startBtn = document.getElementById("start");
+      const stopBtn  = document.getElementById("stop");
 
-if(lastMessage[who]===text) return;
-lastMessage[who]=text;
+      if (room) { await room.disconnect(); room = null; }
+      cleanupAudio();
+      clearChat();
+      startBtn.disabled = true;
+      setStatus("⏳ Connecting...");
 
-const chat=document.getElementById("chat");
-const empty=document.getElementById("empty-chat");
+      try {
+        const res  = await fetch(TOKEN_URL);
+        const data = await res.json();
+        if (data.error) { setStatus("❌ " + data.error); startBtn.disabled = false; return; }
 
-if(empty) empty.remove();
+        room = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
 
-const div=document.createElement("div");
-div.className="msg "+who;
+        // ✅ FIX: One audio element per track SID — prevents multiple voices
+        const audioTracks = new Map();
 
-div.innerHTML=
-`<div class="label">${who==="agent"?"🤖 Mia":"🎤 You"}</div>${text}`;
+        room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, pub, participant) => {
+          if (track.kind === LivekitClient.Track.Kind.Audio) {
+            // Kill any existing element for this track first
+            if (audioTracks.has(track.sid)) {
+              const existing = audioTracks.get(track.sid);
+              existing.pause();
+              existing.remove();
+              audioTracks.delete(track.sid);
+            }
 
-chat.appendChild(div);
-chat.scrollTop=chat.scrollHeight;
-}
+            const el = track.attach();
+            el.autoplay = true;
+            el.style.display = "none";
+            document.body.appendChild(el);
+            audioTracks.set(track.sid, el);
+            audioElements.push(el);
 
-function handleTranscription(segments,participant){
+            el.play().catch(() => {
+              setStatus("🔔 Click anywhere to enable audio");
+              document.body.addEventListener("click", () => el.play(), { once: true });
+            });
+            console.log("✅ Audio track attached:", track.sid, "from", participant.identity);
+          }
+        });
 
-const isAgent = participant && (participant.isAgent || participant.identity !== "manager-test");
+        room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
+          if (audioTracks.has(track.sid)) {
+            const el = audioTracks.get(track.sid);
+            track.detach(el);
+            el.pause();
+            el.remove();
+            audioTracks.delete(track.sid);
+          }
+        });
 
-const who = isAgent ? "agent" : "user";
+        // ✅ Single transcription listener only
+        room.on(LivekitClient.RoomEvent.TranscriptionReceived, handleTranscription);
 
-segments.forEach(seg=>{
-if(!seg.text) return;
-if(seg.final===false) return;
-addMessage(who,seg.text);
-});
-}
+        room.on(LivekitClient.RoomEvent.Connected, () => {
+          setStatus("✅ Connected — Mia will greet you shortly!");
+          startBtn.style.display = "none";
+          stopBtn.style.display  = "inline-block";
+          startBtn.disabled = false;
+        });
 
-async function connectRoom(){
+        room.on(LivekitClient.RoomEvent.Reconnecting, () => setStatus("🔄 Reconnecting..."));
+        room.on(LivekitClient.RoomEvent.Reconnected,  () => setStatus("✅ Reconnected!"));
+        room.on(LivekitClient.RoomEvent.Disconnected, () => {
+          setStatus("🔌 Disconnected");
+          startBtn.style.display = "inline-block";
+          stopBtn.style.display  = "none";
+          startBtn.disabled = false;
+          cleanupAudio();
+        });
 
-const startBtn=document.getElementById("start");
-const stopBtn=document.getElementById("stop");
+        await room.connect(LIVEKIT_URL, data.token);
 
-if(room){
-await room.disconnect();
-room=null;
-}
+        // Enable mic with echo cancellation
+        await room.localParticipant.setMicrophoneEnabled(true, {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        });
 
-cleanupAudio();
-clearChat();
+      } catch (err) {
+        setStatus("❌ Error: " + err.message);
+        console.error(err);
+        startBtn.disabled = false;
+      }
+    }
 
-startBtn.disabled=true;
-
-setStatus("⏳ Connecting...");
-
-try{
-
-const res=await fetch(TOKEN_URL);
-const data=await res.json();
-
-if(data.error){
-setStatus("❌ "+data.error);
-startBtn.disabled=false;
-return;
-}
-
-room=new LivekitClient.Room({
-adaptiveStream:true,
-dynacast:true
-});
-
-room.on(LivekitClient.RoomEvent.TrackSubscribed,(track)=>{
-
-if(track.kind===LivekitClient.Track.Kind.Audio){
-
-const el=track.attach();
-el.autoplay=true;
-el.style.display="none";
-
-document.body.appendChild(el);
-
-audioElements.push(el);
-
-el.play().catch(()=>{
-setStatus("🔔 Click anywhere to enable audio");
-document.body.addEventListener("click",()=>el.play(),{once:true});
-});
-}
-});
-
-room.on(LivekitClient.RoomEvent.TranscriptionReceived,handleTranscription);
-
-room.on(LivekitClient.RoomEvent.Connected,()=>{
-setStatus("✅ Connected — Mia will greet you shortly!");
-startBtn.style.display="none";
-stopBtn.style.display="inline-block";
-startBtn.disabled=false;
-});
-
-room.on(LivekitClient.RoomEvent.Disconnected,()=>{
-setStatus("🔌 Disconnected");
-startBtn.style.display="inline-block";
-stopBtn.style.display="none";
-cleanupAudio();
-});
-
-await room.connect(LIVEKIT_URL,data.token);
-
-await room.localParticipant.setMicrophoneEnabled(true,{
-echoCancellation:true,
-noiseSuppression:true,
-autoGainControl:true
-});
-
-}
-catch(err){
-setStatus("❌ Error: "+err.message);
-startBtn.disabled=false;
-console.error(err);
-}
-
-}
-
-async function disconnectRoom(){
-if(room){
-await room.disconnect();
-room=null;
-}
-cleanupAudio();
-}
-
-</script>
+    async function disconnectRoom() {
+      if (room) { await room.disconnect(); room = null; }
+      cleanupAudio();
+    }
+  </script>
 </body>
 </html>
