@@ -1,7 +1,13 @@
-fastapi==0.135.1
+fastapi==0.115.5
+uvicorn==0.32.0
+python-dotenv==1.0.1
 livekit==1.1.2
-livekit_api==1.1.0
-livekit_blingfire==1.1.0
-python-dotenv==1.2.2
-uvicorn
+livekit-api==1.1.0
+livekit-agents==1.4.4
+livekit-plugins-openai==1.4.4
+livekit-plugins-sarvam==1.4.4
+livekit-blingfire==1.1.0
 openai
+aiohttp
+
+# https://voice-agent-rxw5.onrender.com/
