@@ -54,9 +54,11 @@
   <div id="chat"><div id="empty-chat">Start a call to begin the conversation</div></div>
 
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js"></script>
+  <!-- RNNoise: ML-based noise suppression (same tech as Zoom/Discord) -->
+  <script src="https://cdn.jsdelivr.net/npm/@shiguredo/rnnoise-wasm@2024.1.3/dist/rnnoise.js"></script>
   <script>
     const LIVEKIT_URL = "wss://ai-voice-agent-4nwoff2a.livekit.cloud";
-    const TOKEN_URL = "/token";
+    const TOKEN_URL = "/token"; // ✅ relative — works on localhost AND Render
 
     let room = null;
     let audioElements = [];
@@ -112,6 +114,67 @@
         if (seg.final === false) return;
         addMessage(who, seg.text);
       });
+    }
+
+    // ── RNNoise noise cancellation ─────────────────────────────────────
+    async function enableNoiseCancelledMic(room) {
+      try {
+        // Get raw mic with browser AEC
+        const rawStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: false,  // we do this ourselves with RNNoise
+            autoGainControl: true,
+            sampleRate: 48000,
+          }
+        });
+
+        // Try RNNoise if available
+        if (typeof RNNoise !== "undefined") {
+          const rnnoise    = await RNNoise.create();
+          const audioCtx   = new AudioContext({ sampleRate: 48000 });
+          const source     = audioCtx.createMediaStreamSource(rawStream);
+          const dest       = audioCtx.createMediaStreamDestination();
+          const processor  = audioCtx.createScriptProcessor(512, 1, 1);
+
+          processor.onaudioprocess = (e) => {
+            const input  = e.inputBuffer.getChannelData(0);
+            const output = e.outputBuffer.getChannelData(0);
+            // RNNoise processes 480-sample frames at 48kHz
+            const frame  = new Float32Array(480);
+            frame.set(input.subarray(0, 480));
+            rnnoise.processFrame(frame);
+            output.set(frame);
+          };
+
+          source.connect(processor);
+          processor.connect(dest);
+
+          // Publish the noise-cancelled stream
+          const cleanTrack = dest.stream.getAudioTracks()[0];
+          await room.localParticipant.publishTrack(cleanTrack, {
+            name: "microphone",
+            source: LivekitClient.Track.Source.Microphone,
+          });
+          console.log("✅ RNNoise noise cancellation active");
+          setStatus("✅ Connected — Mia will greet you shortly! 🎙️ Noise cancellation ON");
+        } else {
+          // Fallback: standard mic without RNNoise
+          await room.localParticipant.setMicrophoneEnabled(true, {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          });
+          console.log("ℹ️ RNNoise not loaded — using browser noise suppression");
+        }
+      } catch (err) {
+        console.warn("⚠️ Noise cancellation setup failed, using standard mic:", err);
+        await room.localParticipant.setMicrophoneEnabled(true, {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        });
+      }
     }
 
     async function connectRoom() {
@@ -192,11 +255,8 @@
         await room.connect(LIVEKIT_URL, data.token);
 
         // Enable mic with echo cancellation
-        await room.localParticipant.setMicrophoneEnabled(true, {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        });
+        // ✅ RNNoise: ML noise cancellation on mic before LiveKit
+        await enableNoiseCancelledMic(room);
 
       } catch (err) {
         setStatus("❌ Error: " + err.message);

@@ -6,8 +6,8 @@ livekit-api==1.1.0
 livekit-agents==1.4.4
 livekit-plugins-openai==1.4.4
 livekit-plugins-sarvam==1.4.4
+livekit-plugins-silero==1.4.4
 livekit-blingfire==1.1.0
 openai
 aiohttp
-
-# https://voice-agent-rxw5.onrender.com/
+qdrant-client==1.13.3
