@@ -1,146 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <title>ABC Voice Agent — Mia</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #0f172a; color: white;
-      display: flex; flex-direction: column;
-      align-items: center; padding: 40px 20px; min-height: 100vh;
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:'Segoe UI',sans-serif;
+      background:#0f172a;color:white;
+      display:flex;flex-direction:column;align-items:center;
+      padding:40px 20px;min-height:100vh;
     }
-    h2 { font-size: 26px; margin-bottom: 6px; }
-    #subtitle { color: #64748b; font-size: 14px; margin-bottom: 28px; }
-    .btn-row { display: flex; gap: 12px; margin-bottom: 20px; }
-    button {
-      padding: 14px 36px; font-size: 16px; cursor: pointer;
-      border-radius: 12px; border: none; font-weight: 600; transition: opacity 0.2s;
+    h2{font-size:26px;margin-bottom:6px}
+    #subtitle{color:#64748b;font-size:14px;margin-bottom:28px}
+
+    /* Language selector */
+    #lang-selector{
+      display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;justify-content:center;
     }
-    button:hover { opacity: 0.85; }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    #start { background: #22c55e; color: white; }
-    #stop  { background: #ef4444; color: white; display: none; }
-    #status-bar {
-      background: #1e293b; border-radius: 10px;
-      padding: 10px 20px; font-size: 14px; color: #94a3b8;
-      margin-bottom: 20px; min-width: 320px; text-align: center;
+    .lang-btn{
+      padding:10px 24px;font-size:14px;font-weight:600;
+      border-radius:20px;border:2px solid #334155;
+      background:transparent;color:#94a3b8;cursor:pointer;
+      transition:all 0.2s;
     }
-    #chat {
-      width: 100%; max-width: 560px; background: #1e293b;
-      border-radius: 14px; padding: 20px;
-      min-height: 200px; max-height: 440px;
-      overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+    .lang-btn:hover{border-color:#6366f1;color:white}
+    .lang-btn.active{
+      background:#6366f1;border-color:#6366f1;color:white;
     }
-    .msg {
-      padding: 10px 14px; border-radius: 10px;
-      font-size: 14px; line-height: 1.5; max-width: 85%; word-wrap: break-word;
+
+    .btn-row{display:flex;gap:12px;margin-bottom:20px}
+    button.call-btn{
+      padding:14px 40px;font-size:16px;cursor:pointer;
+      border-radius:12px;border:none;font-weight:600;transition:all 0.2s;
     }
-    .msg.agent { background: #334155; color: #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; }
-    .msg.user  { background: #2563eb; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
-    .msg .label { font-size: 11px; opacity: 0.6; margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
-    #empty-chat { color: #475569; font-size: 14px; text-align: center; margin: auto; }
+    button.call-btn:hover{opacity:.85}
+    button.call-btn:disabled{opacity:.4;cursor:not-allowed}
+    #start{background:#22c55e;color:white}
+    #stop{background:#ef4444;color:white;display:none}
+
+    #status-bar{
+      background:#1e293b;border-radius:10px;
+      padding:12px 28px;font-size:14px;color:#94a3b8;
+      margin-bottom:20px;min-width:320px;text-align:center;
+    }
+
+    /* Voice visualizer */
+    #visualizer{
+      display:flex;align-items:center;justify-content:center;
+      gap:4px;height:48px;margin-bottom:16px;
+    }
+    .bar{
+      width:4px;background:#6366f1;border-radius:2px;
+      animation:none;transition:height 0.1s;
+      height:4px;
+    }
+    .bar.active{animation:pulse 0.6s ease-in-out infinite alternate;}
+    .bar:nth-child(2){animation-delay:0.1s}
+    .bar:nth-child(3){animation-delay:0.2s}
+    .bar:nth-child(4){animation-delay:0.3s}
+    .bar:nth-child(5){animation-delay:0.15s}
+    @keyframes pulse{
+      from{height:4px}
+      to{height:32px}
+    }
   </style>
 </head>
 <body>
   <h2>🎮 ABC Voice Agent</h2>
   <p id="subtitle">Powered by Mia · ABC Games</p>
-  <div class="btn-row">
-    <button id="start" onclick="connectRoom()">📞 Start Call</button>
-    <button id="stop"  onclick="disconnectRoom()">🔴 End Call</button>
+
+  <!-- Language selector -->
+  <div id="lang-selector">
+    <button class="lang-btn active" data-lang="bengali" onclick="selectLang(this)">🇧🇩 Bengali</button>
+    <button class="lang-btn"        data-lang="hindi"   onclick="selectLang(this)">🇮🇳 Hindi</button>
+    <button class="lang-btn"        data-lang="telugu"  onclick="selectLang(this)">🌿 Telugu</button>
   </div>
-  <div id="status-bar">⚪ Not connected</div>
-  <div id="chat"><div id="empty-chat">Start a call to begin the conversation</div></div>
+
+  <div class="btn-row">
+    <button id="start" class="call-btn" onclick="connectRoom()">📞 Start Call</button>
+    <button id="stop"  class="call-btn" onclick="disconnectRoom()">🔴 End Call</button>
+  </div>
+
+  <div id="status-bar">⚪ Select a language and start a call</div>
+
+  <!-- Voice activity visualizer (no transcript) -->
+  <div id="visualizer">
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.7/dist/livekit-client.umd.min.js"></script>
-  <!-- RNNoise: ML-based noise suppression (same tech as Zoom/Discord) -->
+  <!-- RNNoise: ML noise cancellation -->
   <script src="https://cdn.jsdelivr.net/npm/@shiguredo/rnnoise-wasm@2024.1.3/dist/rnnoise.js"></script>
+
   <script>
     const LIVEKIT_URL = "wss://ai-voice-agent-4nwoff2a.livekit.cloud";
-    const TOKEN_URL = "/token"; // ✅ relative — works on localhost AND Render
+    const TOKEN_URL   = "/token";
 
-    let room = null;
+    let room          = null;
+    let audioTracks   = new Map();
     let audioElements = [];
+    let selectedLang  = "bengali";
 
-    // Dedup: track by segmentId + last content per speaker
-    const shownSegments = new Set();
-    const lastMessage = { agent: "", user: "" };
+    function selectLang(btn) {
+      if (room) return; // prevent switching mid-call
+      document.querySelectorAll(".lang-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedLang = btn.dataset.lang;
+      setStatus(`⚪ ${btn.textContent} selected — press Start Call`);
+    }
 
-    function setStatus(msg) { document.getElementById("status-bar").textContent = msg; }
+    function setStatus(msg) {
+      document.getElementById("status-bar").textContent = msg;
+    }
 
-    function clearChat() {
-      document.getElementById("chat").innerHTML = '<div id="empty-chat">Start a call to begin the conversation</div>';
-      lastMessage.agent = "";
-      lastMessage.user  = "";
-      shownSegments.clear();
+    function setVisualizer(active) {
+      document.querySelectorAll(".bar").forEach(b => {
+        b.classList.toggle("active", active);
+      });
     }
 
     function cleanupAudio() {
       audioElements.forEach(el => { el.pause(); el.remove(); });
       audioElements = [];
+      audioTracks.clear();
     }
 
-    function addMessage(who, text, segId) {
-      text = text.trim();
-      if (!text) return;
-
-      // Skip if we already showed this segment ID
-      if (segId && shownSegments.has(segId)) return;
-      if (segId) shownSegments.add(segId);
-
-      // Skip if exact same text just shown for this speaker (content dedup)
-      if (lastMessage[who] === text) return;
-      lastMessage[who] = text;
-
-      const chat = document.getElementById("chat");
-      const empty = document.getElementById("empty-chat");
-      if (empty) empty.remove();
-
-      const div = document.createElement("div");
-      div.className = "msg " + who;
-      div.innerHTML = `<div class="label">${who === "agent" ? "🤖 Mia" : "🎤 You"}</div>${text}`;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    function handleTranscription(segments, participant) {
-      const isAgent = participant && (participant.isAgent || participant.identity !== "manager-test");
-      const who = isAgent ? "agent" : "user";
-      segments.forEach(seg => {
-        if (!seg.text || seg.text.trim() === "") return;
-        // ✅ Only show FINAL segments — ignore mid-stream partial updates
-        // Only show if final=true OR final is undefined (treat undefined as final)
-        if (seg.final === false) return;
-        addMessage(who, seg.text);
-      });
-    }
-
-    // ── RNNoise noise cancellation ─────────────────────────────────────
+    // ── RNNoise noise cancellation ─────────────────────────────────────────
     async function enableNoiseCancelledMic(room) {
       try {
-        // Get raw mic with browser AEC
         const rawStream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
-            noiseSuppression: false,  // we do this ourselves with RNNoise
+            noiseSuppression: false,
             autoGainControl: true,
             sampleRate: 48000,
           }
         });
 
-        // Try RNNoise if available
         if (typeof RNNoise !== "undefined") {
-          const rnnoise    = await RNNoise.create();
-          const audioCtx   = new AudioContext({ sampleRate: 48000 });
-          const source     = audioCtx.createMediaStreamSource(rawStream);
-          const dest       = audioCtx.createMediaStreamDestination();
-          const processor  = audioCtx.createScriptProcessor(512, 1, 1);
+          const rnnoise   = await RNNoise.create();
+          const audioCtx  = new AudioContext({ sampleRate: 48000 });
+          const source    = audioCtx.createMediaStreamSource(rawStream);
+          const dest      = audioCtx.createMediaStreamDestination();
+          const processor = audioCtx.createScriptProcessor(512, 1, 1);
 
           processor.onaudioprocess = (e) => {
             const input  = e.inputBuffer.getChannelData(0);
             const output = e.outputBuffer.getChannelData(0);
-            // RNNoise processes 480-sample frames at 48kHz
             const frame  = new Float32Array(480);
             frame.set(input.subarray(0, 480));
             rnnoise.processFrame(frame);
@@ -150,25 +161,21 @@
           source.connect(processor);
           processor.connect(dest);
 
-          // Publish the noise-cancelled stream
           const cleanTrack = dest.stream.getAudioTracks()[0];
           await room.localParticipant.publishTrack(cleanTrack, {
             name: "microphone",
             source: LivekitClient.Track.Source.Microphone,
           });
-          console.log("✅ RNNoise noise cancellation active");
-          setStatus("✅ Connected — Mia will greet you shortly! 🎙️ Noise cancellation ON");
+          console.log("✅ RNNoise active");
         } else {
-          // Fallback: standard mic without RNNoise
           await room.localParticipant.setMicrophoneEnabled(true, {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
           });
-          console.log("ℹ️ RNNoise not loaded — using browser noise suppression");
         }
       } catch (err) {
-        console.warn("⚠️ Noise cancellation setup failed, using standard mic:", err);
+        console.warn("⚠️ Noise setup failed:", err);
         await room.localParticipant.setMicrophoneEnabled(true, {
           echoCancellation: true,
           noiseSuppression: true,
@@ -183,57 +190,56 @@
 
       if (room) { await room.disconnect(); room = null; }
       cleanupAudio();
-      clearChat();
       startBtn.disabled = true;
+
+      // Disable language switching during call
+      document.querySelectorAll(".lang-btn").forEach(b => b.style.pointerEvents = "none");
+
       setStatus("⏳ Connecting...");
 
       try {
-        const res  = await fetch(TOKEN_URL);
+        const res  = await fetch(`${TOKEN_URL}?language=${selectedLang}`);
         const data = await res.json();
         if (data.error) { setStatus("❌ " + data.error); startBtn.disabled = false; return; }
 
         room = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
 
-        // ✅ FIX: One audio element per track SID — prevents multiple voices
-        const audioTracks = new Map();
-
+        // ── One audio element per track ──────────────────────────────────
         room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, pub, participant) => {
           if (track.kind === LivekitClient.Track.Kind.Audio) {
-            // Kill any existing element for this track first
             if (audioTracks.has(track.sid)) {
-              const existing = audioTracks.get(track.sid);
-              existing.pause();
-              existing.remove();
+              const old = audioTracks.get(track.sid);
+              old.pause(); old.remove();
               audioTracks.delete(track.sid);
             }
-
             const el = track.attach();
             el.autoplay = true;
             el.style.display = "none";
             document.body.appendChild(el);
             audioTracks.set(track.sid, el);
             audioElements.push(el);
-
             el.play().catch(() => {
               setStatus("🔔 Click anywhere to enable audio");
               document.body.addEventListener("click", () => el.play(), { once: true });
             });
-            console.log("✅ Audio track attached:", track.sid, "from", participant.identity);
           }
         });
 
         room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
           if (audioTracks.has(track.sid)) {
             const el = audioTracks.get(track.sid);
-            track.detach(el);
-            el.pause();
-            el.remove();
+            track.detach(el); el.pause(); el.remove();
             audioTracks.delete(track.sid);
           }
         });
 
-        // ✅ Single transcription listener only
-        room.on(LivekitClient.RoomEvent.TranscriptionReceived, handleTranscription);
+        // ── Voice activity → animate visualizer (no transcript) ──────────
+        room.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+          const agentSpeaking = speakers.some(s => s.identity !== "manager-test");
+          setVisualizer(agentSpeaking);
+          if (agentSpeaking) setStatus("🔊 Mia is speaking...");
+          else setStatus("🎙️ Listening...");
+        });
 
         room.on(LivekitClient.RoomEvent.Connected, () => {
           setStatus("✅ Connected — Mia will greet you shortly!");
@@ -244,30 +250,33 @@
 
         room.on(LivekitClient.RoomEvent.Reconnecting, () => setStatus("🔄 Reconnecting..."));
         room.on(LivekitClient.RoomEvent.Reconnected,  () => setStatus("✅ Reconnected!"));
+
         room.on(LivekitClient.RoomEvent.Disconnected, () => {
-          setStatus("🔌 Disconnected");
+          setStatus("🔌 Call ended");
           startBtn.style.display = "inline-block";
           stopBtn.style.display  = "none";
           startBtn.disabled = false;
+          setVisualizer(false);
+          document.querySelectorAll(".lang-btn").forEach(b => b.style.pointerEvents = "auto");
           cleanupAudio();
         });
 
         await room.connect(LIVEKIT_URL, data.token);
-
-        // Enable mic with echo cancellation
-        // ✅ RNNoise: ML noise cancellation on mic before LiveKit
         await enableNoiseCancelledMic(room);
 
       } catch (err) {
         setStatus("❌ Error: " + err.message);
-        console.error(err);
         startBtn.disabled = false;
+        document.querySelectorAll(".lang-btn").forEach(b => b.style.pointerEvents = "auto");
+        console.error(err);
       }
     }
 
     async function disconnectRoom() {
       if (room) { await room.disconnect(); room = null; }
       cleanupAudio();
+      setVisualizer(false);
+      document.querySelectorAll(".lang-btn").forEach(b => b.style.pointerEvents = "auto");
     }
   </script>
 </body>

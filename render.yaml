@@ -1,6 +1,88 @@
 services:
+  # ── Web Service ───────────────────────────────────────────────
   - type: web
-    name: voice-agent
+    name: voice-agent-web
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python server.py
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+
+  # ── Bengali Worker ────────────────────────────────────────────
+  - type: worker
+    name: voice-agent-bengali
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python agent_bengali.py start
+    envVars:
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+
+  # ── Hindi Worker ──────────────────────────────────────────────
+  - type: worker
+    name: voice-agent-hindi
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python agent_hindi.py start
+    envVars:
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+
+  # ── Telugu Worker ─────────────────────────────────────────────
+  - type: worker
+    name: voice-agent-telugu
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python agent_telugu.py start
+    envVars:
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
