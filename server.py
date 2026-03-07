@@ -7,7 +7,7 @@ from livekit.api import (
     AccessToken, VideoGrants, LiveKitAPI,
     CreateAgentDispatchRequest
 )
-from livekit.api.livekit_room import CreateRoomRequest
+from livekit.api import CreateRoomRequest
 
 load_dotenv()
 
