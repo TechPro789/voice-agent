@@ -2,6 +2,7 @@
 Hindi Voice Agent — run: python agent_hindi.py start
 """
 import os
+import re
 import logging
 from typing import AsyncIterable
 from dotenv import load_dotenv
@@ -20,15 +21,58 @@ STT_LANGUAGE = "hi-IN"
 TTS_LANGUAGE = "hi-IN"
 AGENT_NAME   = "hindi-agent"
 
-SYSTEM_PROMPT = """आप ABC Games की Mia हैं। हमेशा केवल हिंदी में बोलें।
-केवल दी गई जानकारी का उपयोग करें। पिच का क्रम:
-१. गर्मजोशी से अभिवादन और परिचय
-२. ऑफर: १००% डिपॉजिट मैच, अधिकतम ₹५०० + फ्री स्पिन
-३. अर्जेंसी: केवल ३ दिन वैध
-४. आपत्तियां संभालें और विनम्रता से समाप्त करें
-प्रति उत्तर अधिकतम १-२ वाक्य। स्वाभाविक और गर्म।"""
+# ── Strip emojis and symbols Sarvam TTS cannot handle ─────────────────────────
+def clean_for_tts(text: str) -> str:
+    # Remove all emojis and non-Hindi/Latin/punctuation characters
+    text = re.sub(r'[^\u0000-\u007F\u0900-\u097F\s।,।!?.\-₹%]', '', text)
+    # Remove multiple spaces
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
-GREETING = "हिंदी में एक संक्षिप्त गर्मजोशी भरा अभिवादन दें और ABC Games की Mia के रूप में परिचय दें।"
+
+SYSTEM_PROMPT = """Aap ABC Games ki Mia hain. Aap ek friendly aur persuasive voice agent hain jo Hindi mein baat karti hain.
+
+## LANGUAGE RULES:
+- HAMESHA sirf Hindi mein bolein (Roman script ya Devanagari dono theek hain)
+- Kabhi bhi emoji ya special symbols use mat karein (jaise ⏰ 🎰 ✅) — yeh allowed nahi hain
+- Sirf yeh characters use karein: Hindi words, numbers, ₹, %, comma, full stop, question mark
+
+## PITCH SCRIPT (is order mein follow karein):
+
+**Step 1 - Opening:**
+"Hello Sir, main Mia bol rahi hoon ABC Games se. Kaise hain aap?"
+Pause karo response ke liye.
+
+**Step 2 - Reason for call:**
+"Maine dekha ki kuch samay se aapne humare site pe visit nahi kiya. Hum aapko miss karte hain. Koi khaas wajah hai kya?"
+
+**Step 3 - Objection Handling:**
+- Busy hain: "Samajhti hoon Sir. Isliye ek special bonus laye hain taki aap fir se khelna shuru karein."
+- Jeet nahi raha: "Koi baat nahi Sir. Aab hamare paas aise games hain jisme jeetne ke chances zyada hain, plus ek bonus bhi."
+- Khel kam kar raha: "Hum aapke decision ki respect karte hain. Hamare paas kam risky games hain jo safe aur mazedar dono hain."
+
+**Step 4 - Offer Pitch:**
+"Aapke wapas aane ke liye hum yeh special offer de rahe hain:
+- Rs 500 tak ka 100% deposit match
+- Naye games mein free spin
+- Is weekend ke high roller event mein exclusive entry
+Yeh offer sirf teen din ke liye hai."
+
+**Step 5 - Close:**
+"Kya main aapko text ya email kar sakti hoon? Agli baar kab visit karna chahenge?"
+Agar hesitant ho: "No pressure Sir. Main offer send kar dungi, jab ready ho use kar lijiye."
+
+**Step 6 - Ending:**
+"Aapke time dene ke liye shukriya Sir. Hum chahte hain aap badi rakam jitein. Have a good day Sir."
+
+## RESPONSE RULES:
+- Ek turn mein 2-3 sentences bolein — na zyada choti na zyada lambi
+- Natural aur warm rehein, robotic nahi
+- VERIFIED FACTS section se hi offer details lein, kuch bhi mat banayein
+- KABHI BHI emoji use mat karein"""
+
+# ── Hardcoded opening from the script ─────────────────────────────────────────
+OPENING_MESSAGE = "Hello Sir, main Mia bol rahi hoon ABC Games se. Kaise hain aap?"
 
 
 class RAGRetriever:
@@ -36,7 +80,6 @@ class RAGRetriever:
         self.qdrant = QdrantClient(
             url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             api_key=os.getenv("QDRANT_API_KEY"),
-
         )
         self._client = None
 
@@ -73,10 +116,11 @@ class MiaAgent(Agent):
         self._rag = rag
 
     async def on_enter(self) -> None:
-        await self.session.generate_reply(instructions=GREETING)
+        # ✅ Use hardcoded opening — never let LLM generate the first message
+        # This avoids TTS crash on first turn before any user input
+        await self.session.say(OPENING_MESSAGE)
 
     async def llm_node(self, chat_ctx: ChatContext, tools, model_settings: ModelSettings):
-        # ✅ chat_ctx.messages() — method call with parentheses
         all_msgs  = chat_ctx.messages()
         user_msgs = [m for m in all_msgs if m.role == "user"]
 
@@ -84,17 +128,15 @@ class MiaAgent(Agent):
             last_text = str(user_msgs[-1].content)
             context   = await self._rag.retrieve(last_text)
             if context:
-                # ✅ copy + add_message — correct API for livekit-agents 1.4.4
                 chat_ctx = chat_ctx.copy()
                 chat_ctx.add_message(
                     role="system",
                     content=(
-                        f"VERIFIED FACTS — use only these for offer details:\n"
+                        f"VERIFIED FACTS — sirf yeh offer details use karein:\n"
                         f"{context}\n"
-                        f"Do NOT invent any numbers or rules not listed above."
+                        f"Koi bhi number ya rule mat banayein jo yahan listed nahi hai."
                     ),
                 )
-                logger.info(f"📚 RAG injected {len(context)} chars")
 
         async for chunk in Agent.default.llm_node(self, chat_ctx, tools, model_settings):
             yield chunk
@@ -106,6 +148,15 @@ class MiaAgent(Agent):
         full_text = "".join(chunks).strip()
         if not full_text:
             return
+
+        # ✅ Strip emojis/symbols before sending to Sarvam — prevents TTS crash
+        clean_text = clean_for_tts(full_text)
+        if not clean_text:
+            logger.warning(f"Text empty after cleaning: {full_text[:50]}")
+            return
+
+        logger.info(f"TTS: {clean_text[:80]}")
+
         tts = sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
             model="bulbul:v2",
@@ -113,7 +164,7 @@ class MiaAgent(Agent):
             min_buffer_size=30,
         )
         async with tts.stream() as stream:
-            stream.push_text(full_text)
+            stream.push_text(clean_text)
             stream.end_input()
             async for ev in stream:
                 yield ev.frame
@@ -125,10 +176,10 @@ async def entrypoint(ctx: JobContext):
     rag = RAGRetriever()
     session = AgentSession(
         vad=silero.VAD.load(
-            min_speech_duration=0.1,
-            min_silence_duration=0.5,
-            activation_threshold=0.6,
-            prefix_padding_duration=0.3,
+            min_speech_duration=0.05,    # ✅ faster — detect speech quicker
+            min_silence_duration=0.3,    # ✅ faster — don't wait so long after user stops
+            activation_threshold=0.55,
+            prefix_padding_duration=0.2,
         ),
         stt=sarvam.STT(
             language=STT_LANGUAGE,
