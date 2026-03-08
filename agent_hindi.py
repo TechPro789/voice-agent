@@ -159,8 +159,8 @@ class MiaAgent(Agent):
 
         tts = sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
-            model="bulbul:v2",
-            speaker="anushka",
+            model="bulbul:v3-beta",
+            speaker="ritu",
             min_buffer_size=30,
         )
         async with tts.stream() as stream:
@@ -189,8 +189,8 @@ async def entrypoint(ctx: JobContext):
         llm=openai.LLM(model="gpt-4o", temperature=0.7),
         tts=sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
-            model="bulbul:v2",
-            speaker="anushka",
+            model="bulbul:v3-beta",
+            speaker="ritu",
             min_buffer_size=30,
         ),
     )
