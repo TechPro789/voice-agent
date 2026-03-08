@@ -36,7 +36,7 @@ class RAGRetriever:
         self.qdrant = QdrantClient(
             url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             api_key=os.getenv("QDRANT_API_KEY"),
-            check_version=False,
+
         )
         self._client = None
 
