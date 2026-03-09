@@ -21,56 +21,53 @@ STT_LANGUAGE = "te-IN"
 TTS_LANGUAGE = "te-IN"
 AGENT_NAME   = "telugu-agent"
 
-# ── Strip emojis and symbols Sarvam TTS cannot handle ─────────────────────────
 def clean_for_tts(text: str) -> str:
-    # Keep Telugu script, Latin, standard punctuation, ₹, %
     text = re.sub(r'[^\u0000-\u007F\u0C00-\u0C7F\s,!?.\-₹%]', '', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
+    return re.sub(r'\s+', ' ', text).strip()
 
 
-SYSTEM_PROMPT = """మీరు ABC Games యొక్క Mia — ఒక స్నేహపూర్వక మరియు విశ్వసనీయమైన voice agent.
+SYSTEM_PROMPT = """Meeru ABC Games yokka Mia. Eppudu Telugu lo matladandi.
 
-## భాషా నియమాలు:
-- ఎల్లప్పుడూ తెలుగులో మాట్లాడండి
-- ఎప్పుడూ emoji లేదా ప్రత్యేక చిహ్నాలు వాడవద్దు (⏰ 🎰 ✅ వంటివి)
-- ఈ అక్షరాలు మాత్రమే వాడండి: తెలుగు పదాలు, సంఖ్యలు, ₹, %, కామా, పూర్ణవిరామం, ప్రశ్నార్థకం
+## Language Rules:
+- ALWAYS Telugu only
+- NEVER use emoji or symbols like ⏰ 🎰 ✅
+- Only use: Telugu words, numbers, Rs, %, comma, period, question mark
 
-## పిచ్ స్క్రిప్ట్ (ఈ క్రమంలో అనుసరించండి):
+## Pitch Script (follow this order):
 
-**దశ 1 - శుభాకాంక్షలు:**
-"హలో Sir, నేను ABC Games నుండి Mia మాట్లాడుతున్నాను. మీరు ఎలా ఉన్నారు?"
-సమాధానం కోసం వేచి ఉండండి.
+Step 1 - Opening:
+"Hello Sir, nenu Mia matladutunnanu ABC Games nundi. Ela unnaru meeru?"
+Wait for response. If busy, ask for a better time.
 
-**దశ 2 - కారణం:**
-"మీరు కొంతకాలంగా మా సైట్‌కి రాలేదని గమనించాను. మేము మిమ్మల్ని miss చేస్తున్నాము. ఏదైనా ప్రత్యేక కారణం ఉందా?"
+Step 2 - Reason:
+"Nenu gamaninchanu, konni rojulu nundi meeru mana site ki visit cheyaledu. Memu mimmalni miss ayyamu. Meeru mana site ki visit cheyakapovadaniki emaina pratyeka reason unda ani check chesukuntunnanu."
 
-**దశ 3 - అభ్యంతరాల నిర్వహణ:**
-- బిజీగా ఉంటే: "అర్థమవుతోంది Sir. అందుకే మీ కోసం ఒక special bonus తెచ్చాను, మళ్ళీ ఆడడం మొదలుపెట్టవచ్చు."
-- గెలవడం లేదు అంటే: "పర్వాలేదు Sir. ఇప్పుడు గెలవడానికి ఎక్కువ అవకాశాలున్న games ఉన్నాయి, bonus కూడా ఉంటుంది."
-- ఆడటం తగ్గిస్తున్నారు అంటే: "మీ నిర్ణయాన్ని గౌరవిస్తాము Sir. తక్కువ risky games ఉన్నాయి, అవి సురక్షితంగా మరియు సరదాగా ఉంటాయి."
+Step 3 - Objections:
+- Busy: "Nenu artham chesukuntunnanu Sir. Kani isari memu meeku oka special bonus istunnamu, meeru malli adadam start cheyavachu."
+- Not winning: "No problem Sir. Ippudu chala games unnay, vaatilo gelavadaniki chances ekkuva. Nenu meeku oka bonus istanu."
+- Playing less: "Memu me decision ki respect istunnamu Sir. Mana degara low-risk games unnay, avi thakkuva risky ga mariyu deposit limits limited. Games fun kuda untay, safe kuda untay."
 
-**దశ 4 - ఆఫర్:**
-"మీరు తిరిగి రావడానికి ఈ special offer ఇస్తున్నాము:
-- Rs 500 వరకు 100% deposit match
-- కొత్త games లో free spin
-- ఈ weekend high roller event లో exclusive entry
-ఈ ఆఫర్ కేవలం మూడు రోజులు మాత్రమే."
+Step 4 - Offer:
+"Meeru malli join avvadaniki memu konni special offers istunnamu:
+- Rs 500 varaku 100% deposit match
+- Mana kotta games lo free spins
+- Ee weekend high roller event lo exclusive entry
+Ee offer kevalam moodu rojulu matrame untundi."
 
-**దశ 5 - Close:**
-"నేను మీకు text లేదా email చేయవచ్చా? తర్వాత ఎప్పుడు visit చేయాలనుకుంటున్నారు?"
-సందేహంగా ఉంటే: "ఏ pressure లేదు Sir. నేను offer పంపిస్తాను, ready అయినప్పుడు వాడుకోండి."
+Step 5 - Close:
+"Nenu meeku text leka email pampagalanaa? Next time visit cheyadaniki eppudu convenient?"
+If hesitant: "No pressure Sir. Nenu meeku offer pampistanu, meeru ready ainappudu use cheyandi."
 
-**దశ 6 - వీడ్కోలు:**
-"మీ సమయానికి ధన్యవాదాలు Sir. మీరు పెద్ద మొత్తం గెలవాలని ఆశిస్తున్నాను. శుభ దినం."
+Step 6 - Ending:
+"Mee time icchinanduku thanks Sir. Meeru pedda gelupu gelavalani korukuntunnamu. Have a good day Sir."
 
-## సమాధాన నియమాలు:
-- ప్రతిసారి 2-3 వాక్యాలు చెప్పండి — చాలా చిన్నవి కాదు, చాలా పెద్దవి కాదు
-- సహజంగా మరియు వెచ్చగా ఉండండి, robotic కాదు
-- VERIFIED FACTS నుండి మాత్రమే offer details తీసుకోండి
-- ఎప్పుడూ emoji వాడవద్దు"""
+## Response Rules:
+- 2-3 sentences per turn
+- Natural and warm, not robotic
+- Use only VERIFIED FACTS for offer details
+- NEVER use emoji"""
 
-OPENING_MESSAGE = "హలో Sir, నేను ABC Games నుండి Mia మాట్లాడుతున్నాను. మీరు ఎలా ఉన్నారు?"
+OPENING_MESSAGE = "Hello Sir, nenu Mia matladutunnanu ABC Games nundi. Ela unnaru meeru?"
 
 
 class RAGRetriever:
@@ -79,20 +76,18 @@ class RAGRetriever:
             url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             api_key=os.getenv("QDRANT_API_KEY"),
         )
-        self._client = None
+        self._oai_client = None
 
     async def _get_client(self):
-        if self._client is None:
+        if self._oai_client is None:
             from openai import AsyncOpenAI
-            self._client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        return self._client
+            self._oai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        return self._oai_client
 
     async def retrieve(self, query: str, top_k: int = 3) -> str:
         try:
             client  = await self._get_client()
-            resp    = await client.embeddings.create(
-                input=query, model="text-embedding-3-small"
-            )
+            resp    = await client.embeddings.create(input=query, model="text-embedding-3-small")
             vector  = resp.data[0].embedding
             results = self.qdrant.search(
                 collection_name="abc_games",
@@ -114,56 +109,35 @@ class MiaAgent(Agent):
         self._rag = rag
 
     async def on_enter(self) -> None:
-        # ✅ Hardcoded opening — instant, no LLM, no emoji risk
         await self.session.say(OPENING_MESSAGE)
 
     async def llm_node(self, chat_ctx: ChatContext, tools, model_settings: ModelSettings):
-        # ✅ messages() — method call with parentheses
         all_msgs  = chat_ctx.messages()
         user_msgs = [m for m in all_msgs if m.role == "user"]
-
         if user_msgs:
-            last_text = str(user_msgs[-1].content)
-            context   = await self._rag.retrieve(last_text)
+            context = await self._rag.retrieve(str(user_msgs[-1].content))
             if context:
-                # ✅ add_message — correct API
                 chat_ctx = chat_ctx.copy()
                 chat_ctx.add_message(
                     role="system",
-                    content=(
-                        f"VERIFIED FACTS — ఈ offer details మాత్రమే వాడండి:\n"
-                        f"{context}\n"
-                        f"ఇక్కడ లేని ఏ సంఖ్యలు లేదా నియమాలు తయారు చేయవద్దు."
-                    ),
+                    content=f"VERIFIED FACTS — use only these:\n{context}\nDo NOT invent numbers or rules.",
                 )
-
         async for chunk in Agent.default.llm_node(self, chat_ctx, tools, model_settings):
             yield chunk
 
     async def tts_node(self, text: AsyncIterable[str], model_settings: ModelSettings):
-        chunks = []
-        async for chunk in text:
-            chunks.append(chunk)
-        full_text = "".join(chunks).strip()
-        if not full_text:
-            return
-
-        # ✅ Strip emojis before sending to Sarvam
-        clean_text = clean_for_tts(full_text)
-        if not clean_text:
-            logger.warning(f"Text empty after cleaning: {full_text[:50]}")
-            return
-
-        logger.info(f"TTS [{TTS_LANGUAGE}]: {clean_text[:80]}")
-
+        # ✅ STREAMING — push chunks to TTS as LLM generates them, no buffering
         tts = sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
-            model="bulbul:v3-beta",  # ✅ v3-beta — better accent, customer care trained
-            speaker="kavya",         # ✅ kavya — natural Telugu female customer care voice
+            model="bulbul:v3-beta",
+            speaker="kavya",
             min_buffer_size=30,
         )
         async with tts.stream() as stream:
-            stream.push_text(clean_text)
+            async for chunk in text:
+                clean = clean_for_tts(chunk)
+                if clean:
+                    stream.push_text(clean)
             stream.end_input()
             async for ev in stream:
                 yield ev.frame
@@ -180,11 +154,7 @@ async def entrypoint(ctx: JobContext):
             activation_threshold=0.55,
             prefix_padding_duration=0.2,
         ),
-        stt=sarvam.STT(
-            language=STT_LANGUAGE,
-            model="saarika:v2.5",
-            mode="transcribe",
-        ),
+        stt=sarvam.STT(language=STT_LANGUAGE, model="saarika:v2.5", mode="transcribe"),
         llm=openai.LLM(model="gpt-4o", temperature=0.7),
         tts=sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
@@ -197,7 +167,4 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(
-        entrypoint_fnc=entrypoint,
-        agent_name=AGENT_NAME,
-    ))
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, agent_name=AGENT_NAME))

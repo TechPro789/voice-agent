@@ -21,56 +21,53 @@ STT_LANGUAGE = "bn-IN"
 TTS_LANGUAGE = "bn-IN"
 AGENT_NAME   = "bengali-agent"
 
-# ── Strip emojis and symbols Sarvam TTS cannot handle ─────────────────────────
 def clean_for_tts(text: str) -> str:
-    # Keep Bengali script, Latin, standard punctuation, ₹, %
     text = re.sub(r'[^\u0000-\u007F\u0980-\u09FF\s।,!?.\-₹%]', '', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
+    return re.sub(r'\s+', ' ', text).strip()
 
 
-SYSTEM_PROMPT = """আপনি ABC Games-এর Mia — একজন বন্ধুত্বপূর্ণ এবং বিশ্বাসযোগ্য voice agent।
+SYSTEM_PROMPT = """Apni ABC Games-er Mia. Sorboda Banglay katha bolun.
 
-## ভাষার নিয়ম:
-- সবসময় শুধুমাত্র বাংলায় কথা বলুন
-- কখনো emoji বা বিশেষ চিহ্ন ব্যবহার করবেন না (যেমন ⏰ 🎰 ✅)
-- শুধুমাত্র এই অক্ষর ব্যবহার করুন: বাংলা শব্দ, সংখ্যা, ₹, %, কমা, দাড়ি, প্রশ্নবোধক চিহ্ন
+## Bhashar Niyom:
+- SORBODA shudhu Banglay bolun
+- Kabhi emoji ba bishesh chihn byabohar korben na (jemon ⏰ 🎰 ✅)
+- Shudhu ei akshor: Bangla shobdo, shongkha, Rs, %, kama, dari, proshnobodhok chihn
 
-## পিচ স্ক্রিপ্ট (এই ক্রমে অনুসরণ করুন):
+## Pitch Script (ei krome onusoron korun):
 
-**ধাপ ১ - শুভেচ্ছা:**
-"হ্যালো Sir, আমি Mia বলছি ABC Games থেকে। কেমন আছেন আপনি?"
-উত্তরের জন্য অপেক্ষা করুন।
+Dhap 1 - Shovakansha:
+"Hello Sir, ami Mia bolchi ABC Games theke. Kemon achhen aapni?"
+Uttoror jonyo opekkha korun. Byasto thakle, call-er jonyo valo somoy jigesh korun.
 
-**ধাপ ২ - কারণ:**
-"আমি দেখলাম কিছুদিন ধরে আপনি আমাদের সাইটে আসেননি। আমরা আপনাকে miss করছি। কোনো বিশেষ কারণ আছে কি?"
+Dhap 2 - Karon:
+"Ami lakkho korechi, onek din dhore apni amader site-e ashen ni. Amra apnake miss korchi. Apni amader site-e na ashar kono bishesh karon ache ki?"
 
-**ধাপ ৩ - আপত্তি সামলানো:**
-- ব্যস্ত থাকলে: "বুঝতে পারছি Sir। তাই আপনার জন্য একটি special bonus নিয়ে এসেছি যাতে আবার খেলা শুরু করতে পারেন।"
-- জিততে পারছেন না: "কোনো সমস্যা নেই Sir। এখন এমন games আছে যেখানে জেতার সুযোগ বেশি, সাথে bonus-ও পাবেন।"
-- খেলা কমাচ্ছেন: "আমরা আপনার সিদ্ধান্তকে সম্মান করি Sir। আমাদের কাছে কম risky games আছে যা নিরাপদ এবং মজাদার।"
+Dhap 3 - Attiposhar Samala:
+- Byasto: "Bujhte parchhi Sir. Tai apnar jonyo ekta special bonus niye eshechhi, jate apni abar khelar shuru korte paren."
+- Jitchen na: "Kono somosya nei Sir. Ekhon emon games achhe jekhane jethar shujog beshi. Ami apnake ekta bonus-o dite pari."
+- Khela taggachhen: "Apnar shiddhanto shomman kori Sir. Amader kache kom risky games achhe, jevabe games fun o hoy, safe-o thake."
 
-**ধাপ ৪ - অফার:**
-"আপনার ফিরে আসার জন্য আমরা special offer দিচ্ছি:
-- Rs 500 পর্যন্ত 100% deposit match
-- নতুন games-এ free spin
-- এই weekend-এর high roller event-এ exclusive entry
-এই অফার মাত্র তিন দিনের জন্য।"
+Dhap 4 - Offer:
+"Apnar phire ashar jonyo kichhu special offer dichhi:
+- Rs 500 porjonto 100% deposit match
+- Noya games-e free spin
+- Ei weekend-er high roller event-e exclusive entry
+Ei offer matro teen din-er jonyo."
 
-**ধাপ ৫ - Close:**
-"আমি কি আপনাকে text বা email করতে পারি? পরের বার কখন visit করতে চান?"
-দ্বিধা থাকলে: "কোনো pressure নেই Sir। আমি offer পাঠিয়ে দেব, যখন ready হবেন তখন ব্যবহার করবেন।"
+Dhap 5 - Close:
+"Ami ki apnake text ba email korte pari? Apni poreri baar kakhon visit korte chaan?"
+Dubidhay thakle: "Kono pressure nei Sir. Ami offer pathiye debo, jakhon ready hoben takhon use korun."
 
-**ধাপ ৬ - বিদায়:**
-"সময় দেওয়ার জন্য ধন্যবাদ Sir। আশা করি আপনি বড় পরিমাণ জিতবেন। শুভ দিন হোক।"
+Dhap 6 - Bidai:
+"Shomoy deoar jonyo dhonyobad Sir. Apni boro jeet jetun ei prarthona roilo. Shubho din hok Sir."
 
-## প্রতিক্রিয়ার নিয়ম:
-- প্রতি বার ২-৩টি বাক্য বলুন — খুব ছোট না, খুব বড় না
-- স্বাভাবিক ও উষ্ণ থাকুন, robotic নয়
-- VERIFIED FACTS থেকেই offer details নিন, কিছু বানাবেন না
-- কখনো emoji ব্যবহার করবেন না"""
+## Uttorer Niyom:
+- Protiti barer 2-3ti bakyo bolun
+- Shobhab-sohoj o ushno thakun, robotic na
+- Shudhu VERIFIED FACTS theke offer details nin
+- Kabhi emoji byabohar korben na"""
 
-OPENING_MESSAGE = "হ্যালো Sir, আমি Mia বলছি ABC Games থেকে। কেমন আছেন আপনি?"
+OPENING_MESSAGE = "Hello Sir, ami Mia bolchi ABC Games theke. Kemon achhen aapni?"
 
 
 class RAGRetriever:
@@ -79,20 +76,18 @@ class RAGRetriever:
             url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             api_key=os.getenv("QDRANT_API_KEY"),
         )
-        self._client = None
+        self._oai_client = None
 
     async def _get_client(self):
-        if self._client is None:
+        if self._oai_client is None:
             from openai import AsyncOpenAI
-            self._client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        return self._client
+            self._oai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        return self._oai_client
 
     async def retrieve(self, query: str, top_k: int = 3) -> str:
         try:
             client  = await self._get_client()
-            resp    = await client.embeddings.create(
-                input=query, model="text-embedding-3-small"
-            )
+            resp    = await client.embeddings.create(input=query, model="text-embedding-3-small")
             vector  = resp.data[0].embedding
             results = self.qdrant.search(
                 collection_name="abc_games",
@@ -114,56 +109,35 @@ class MiaAgent(Agent):
         self._rag = rag
 
     async def on_enter(self) -> None:
-        # ✅ Hardcoded opening — no LLM, no emoji risk, instant
         await self.session.say(OPENING_MESSAGE)
 
     async def llm_node(self, chat_ctx: ChatContext, tools, model_settings: ModelSettings):
-        # ✅ messages() — method call with parentheses
         all_msgs  = chat_ctx.messages()
         user_msgs = [m for m in all_msgs if m.role == "user"]
-
         if user_msgs:
-            last_text = str(user_msgs[-1].content)
-            context   = await self._rag.retrieve(last_text)
+            context = await self._rag.retrieve(str(user_msgs[-1].content))
             if context:
-                # ✅ add_message — correct API
                 chat_ctx = chat_ctx.copy()
                 chat_ctx.add_message(
                     role="system",
-                    content=(
-                        f"VERIFIED FACTS — শুধুমাত্র এই offer details ব্যবহার করুন:\n"
-                        f"{context}\n"
-                        f"এখানে listed নেই এমন কোনো number বা rule বানাবেন না।"
-                    ),
+                    content=f"VERIFIED FACTS — shudhu ei offer details byabohar korun:\n{context}\nEkhane nei emon kono shongkha ba niyom tairee korben na.",
                 )
-
         async for chunk in Agent.default.llm_node(self, chat_ctx, tools, model_settings):
             yield chunk
 
     async def tts_node(self, text: AsyncIterable[str], model_settings: ModelSettings):
-        chunks = []
-        async for chunk in text:
-            chunks.append(chunk)
-        full_text = "".join(chunks).strip()
-        if not full_text:
-            return
-
-        # ✅ Strip emojis before sending to Sarvam
-        clean_text = clean_for_tts(full_text)
-        if not clean_text:
-            logger.warning(f"Text empty after cleaning: {full_text[:50]}")
-            return
-
-        logger.info(f"TTS [{TTS_LANGUAGE}]: {clean_text[:80]}")
-
+        # ✅ STREAMING — push chunks to TTS as LLM generates them, no buffering
         tts = sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
-            model="bulbul:v3-beta",  # ✅ v3-beta — better accent, customer care trained
-            speaker="ishita",        # ✅ ishita — natural Bengali female voice
+            model="bulbul:v3-beta",
+            speaker="ishita",
             min_buffer_size=30,
         )
         async with tts.stream() as stream:
-            stream.push_text(clean_text)
+            async for chunk in text:
+                clean = clean_for_tts(chunk)
+                if clean:
+                    stream.push_text(clean)
             stream.end_input()
             async for ev in stream:
                 yield ev.frame
@@ -176,15 +150,11 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession(
         vad=silero.VAD.load(
             min_speech_duration=0.05,
-            min_silence_duration=0.3,    # ✅ faster response
+            min_silence_duration=0.3,
             activation_threshold=0.55,
             prefix_padding_duration=0.2,
         ),
-        stt=sarvam.STT(
-            language=STT_LANGUAGE,
-            model="saarika:v2.5",
-            mode="transcribe",
-        ),
+        stt=sarvam.STT(language=STT_LANGUAGE, model="saarika:v2.5", mode="transcribe"),
         llm=openai.LLM(model="gpt-4o", temperature=0.7),
         tts=sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
@@ -197,7 +167,4 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(
-        entrypoint_fnc=entrypoint,
-        agent_name=AGENT_NAME,
-    ))
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, agent_name=AGENT_NAME))

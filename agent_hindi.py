@@ -142,21 +142,7 @@ class MiaAgent(Agent):
             yield chunk
 
     async def tts_node(self, text: AsyncIterable[str], model_settings: ModelSettings):
-        chunks = []
-        async for chunk in text:
-            chunks.append(chunk)
-        full_text = "".join(chunks).strip()
-        if not full_text:
-            return
-
-        # ✅ Strip emojis/symbols before sending to Sarvam — prevents TTS crash
-        clean_text = clean_for_tts(full_text)
-        if not clean_text:
-            logger.warning(f"Text empty after cleaning: {full_text[:50]}")
-            return
-
-        logger.info(f"TTS: {clean_text[:80]}")
-
+        # ✅ STREAMING — push chunks to TTS as LLM generates them, no buffering
         tts = sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
             model="bulbul:v3-beta",
@@ -164,7 +150,10 @@ class MiaAgent(Agent):
             min_buffer_size=30,
         )
         async with tts.stream() as stream:
-            stream.push_text(clean_text)
+            async for chunk in text:
+                clean = clean_for_tts(chunk)
+                if clean:
+                    stream.push_text(clean)
             stream.end_input()
             async for ev in stream:
                 yield ev.frame
