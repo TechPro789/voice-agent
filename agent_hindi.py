@@ -151,7 +151,7 @@ class MiaAgent(Agent):
             target_language_code=TTS_LANGUAGE,
             model="bulbul:v3-beta",
             speaker="ritu",
-            min_buffer_size=10,  # lower = starts speaking sooner
+            min_buffer_size=30,  # lower = starts speaking sooner
         )
 
         async with tts.stream() as stream:
@@ -198,7 +198,7 @@ async def entrypoint(ctx: JobContext):
             target_language_code=TTS_LANGUAGE,
             model="bulbul:v3-beta",
             speaker="ritu",
-            min_buffer_size=10,
+            min_buffer_size=30,
         ),
     )
     await session.start(agent=MiaAgent(rag=rag), room=ctx.room)
