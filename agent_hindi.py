@@ -3,6 +3,7 @@ Hindi Voice Agent — run: python agent_hindi.py start
 """
 import os
 import re
+import asyncio
 import logging
 from typing import AsyncIterable
 from dotenv import load_dotenv
@@ -23,9 +24,7 @@ AGENT_NAME   = "hindi-agent"
 
 # ── Strip emojis and symbols Sarvam TTS cannot handle ─────────────────────────
 def clean_for_tts(text: str) -> str:
-    # Remove all emojis and non-Hindi/Latin/punctuation characters
     text = re.sub(r'[^\u0000-\u007F\u0900-\u097F\s।,।!?.\-₹%]', '', text)
-    # Remove multiple spaces
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
@@ -71,7 +70,6 @@ Agar hesitant ho: "No pressure Sir. Main offer send kar dungi, jab ready ho use 
 - VERIFIED FACTS section se hi offer details lein, kuch bhi mat banayein
 - KABHI BHI emoji use mat karein"""
 
-# ── Hardcoded opening from the script ─────────────────────────────────────────
 OPENING_MESSAGE = "Hello Sir, main Mia bol rahi hoon ABC Games se. Kaise hain aap?"
 
 
@@ -114,10 +112,16 @@ class MiaAgent(Agent):
     def __init__(self, rag: RAGRetriever) -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
         self._rag = rag
+        # ✅ Reuse a single TTS instance — avoids re-init overhead on every turn
+        self._tts = sarvam.TTS(
+            target_language_code=TTS_LANGUAGE,
+            model="bulbul:v3-beta",
+            speaker="ritu",
+            # ✅ Lowered buffer: starts speaking sooner (was 30)
+            min_buffer_size=10,
+        )
 
     async def on_enter(self) -> None:
-        # ✅ Use hardcoded opening — never let LLM generate the first message
-        # This avoids TTS crash on first turn before any user input
         await self.session.say(OPENING_MESSAGE)
 
     async def llm_node(self, chat_ctx: ChatContext, tools, model_settings: ModelSettings):
@@ -142,32 +146,30 @@ class MiaAgent(Agent):
             yield chunk
 
     async def tts_node(self, text: AsyncIterable[str], model_settings: ModelSettings):
-        chunks = []
-        async for chunk in text:
-            chunks.append(chunk)
-        full_text = "".join(chunks).strip()
-        if not full_text:
-            return
+        """
+        ✅ FIX: Stream LLM chunks directly into TTS instead of buffering the
+        full response first. This cuts first-audio latency from ~40s down to
+        just LLM-time-to-first-token + TTS processing of the first sentence.
+        """
+        async with self._tts.stream() as stream:
 
-        # ✅ Strip emojis/symbols before sending to Sarvam — prevents TTS crash
-        clean_text = clean_for_tts(full_text)
-        if not clean_text:
-            logger.warning(f"Text empty after cleaning: {full_text[:50]}")
-            return
+            async def push_chunks():
+                """Feed cleaned LLM chunks into the TTS stream as they arrive."""
+                async for chunk in text:
+                    clean = clean_for_tts(chunk)
+                    if clean:
+                        stream.push_text(clean)
+                stream.end_input()
 
-        logger.info(f"TTS: {clean_text[:80]}")
+            # Push and consume in parallel so audio starts as soon as
+            # the TTS has buffered enough — no waiting for full LLM output.
+            push_task = asyncio.create_task(push_chunks())
 
-        tts = sarvam.TTS(
-            target_language_code=TTS_LANGUAGE,
-            model="bulbul:v3-beta",
-            speaker="ritu",
-            min_buffer_size=30,
-        )
-        async with tts.stream() as stream:
-            stream.push_text(clean_text)
-            stream.end_input()
             async for ev in stream:
                 yield ev.frame
+
+            # Ensure the push coroutine is fully done before exiting
+            await push_task
 
 
 async def entrypoint(ctx: JobContext):
@@ -176,8 +178,8 @@ async def entrypoint(ctx: JobContext):
     rag = RAGRetriever()
     session = AgentSession(
         vad=silero.VAD.load(
-            min_speech_duration=0.05,    # ✅ faster — detect speech quicker
-            min_silence_duration=0.3,    # ✅ faster — don't wait so long after user stops
+            min_speech_duration=0.05,
+            min_silence_duration=0.3,
             activation_threshold=0.55,
             prefix_padding_duration=0.2,
         ),
@@ -187,11 +189,13 @@ async def entrypoint(ctx: JobContext):
             mode="transcribe",
         ),
         llm=openai.LLM(model="gpt-4o", temperature=0.7),
+        # ✅ Session-level TTS is still needed by AgentSession internally;
+        #    MiaAgent.tts_node overrides actual audio output with its own instance.
         tts=sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
             model="bulbul:v3-beta",
             speaker="ritu",
-            min_buffer_size=30,
+            min_buffer_size=10,
         ),
     )
     await session.start(agent=MiaAgent(rag=rag), room=ctx.room)
