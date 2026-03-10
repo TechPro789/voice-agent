@@ -41,22 +41,40 @@ async def health():
     }
 
 
+async def wait_for_room_sid(lk: LiveKitAPI, room_name: str, retries: int = 8, delay: float = 0.5) -> str:
+    """
+    Poll LiveKit until the room has a real SID.
+    roomID being empty means the room isn't fully registered yet —
+    dispatching before this causes the agent to silently fail.
+    """
+    for attempt in range(retries):
+        try:
+            rooms = await lk.room.list_rooms(names=[room_name])
+            if rooms and rooms[0].sid:
+                print(f"✅ Room SID confirmed: {rooms[0].sid} (attempt {attempt + 1})")
+                return rooms[0].sid
+        except Exception as e:
+            print(f"⚠️ Room poll error (attempt {attempt + 1}): {e}")
+        await asyncio.sleep(delay)
+
+    print(f"⚠️ Room SID never confirmed after {retries} attempts — dispatching anyway")
+    return ""
+
+
 @app.get("/token")
 async def get_token(language: str = Query(default="bengali")):
     if not LIVEKIT_KEY or not LIVEKIT_SECRET or not LIVEKIT_URL:
         return JSONResponse(status_code=500, content={"error": "Missing LiveKit env vars"})
 
     if language not in LANGUAGE_AGENTS:
-        return {"error": f"Unknown language. Choose: bengali, hindi, telugu"}
+        return JSONResponse(status_code=400, content={"error": "Unknown language. Choose: bengali, hindi, telugu"})
 
     agent_name = LANGUAGE_AGENTS[language]
-
-    # ✅ Unique room name per session — prevents dispatch accumulation
-    room_name = f"{language}-{uuid.uuid4().hex[:8]}"
+    room_name  = f"{language}-{uuid.uuid4().hex[:8]}"
 
     async with LiveKitAPI(LIVEKIT_URL, LIVEKIT_KEY, LIVEKIT_SECRET) as lk:
 
-        # Step 1: Create fresh room
+        # Step 1: Create the room
         try:
             room = await lk.room.create_room(
                 CreateRoomRequest(
@@ -65,26 +83,29 @@ async def get_token(language: str = Query(default="bengali")):
                     max_participants=10,
                 )
             )
-            print(f"✅ Room created: {room.name}")
+            print(f"✅ Room created: {room.name} (sid={room.sid!r})")
         except Exception as e:
-            print(f"⚠️ Room note: {e}")
+            print(f"⚠️ Room create error: {e}")
+            return JSONResponse(status_code=500, content={"error": f"Room creation failed: {e}"})
 
-        # Step 2: Small wait for propagation
-        await asyncio.sleep(0.5)
+        # Step 2: Wait until LiveKit Cloud confirms the room has a real SID
+        # ✅ FIX: 0.5s flat sleep was not enough — room SID was empty → dispatch silently failed
+        await wait_for_room_sid(lk, room_name)
 
         # Step 3: Dispatch exactly ONE agent
         try:
-            await lk.agent_dispatch.create_dispatch(
+            dispatch = await lk.agent_dispatch.create_dispatch(
                 CreateAgentDispatchRequest(
                     agent_name=agent_name,
                     room=room_name,
                 )
             )
-            print(f"✅ Dispatched {agent_name} → {room_name}")
+            print(f"✅ Dispatched {agent_name} → {room_name} (dispatch_id={dispatch.id!r})")
         except Exception as e:
-            print(f"⚠️ Dispatch note: {e}")
+            print(f"❌ Dispatch failed: {e}")
+            return JSONResponse(status_code=500, content={"error": f"Agent dispatch failed: {e}"})
 
-    # Step 4: Generate token for this unique room
+    # Step 4: Generate token for this room
     token = (
         AccessToken(LIVEKIT_KEY, LIVEKIT_SECRET)
         .with_identity("manager-test")

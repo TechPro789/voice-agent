@@ -112,14 +112,6 @@ class MiaAgent(Agent):
     def __init__(self, rag: RAGRetriever) -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
         self._rag = rag
-        # ✅ Reuse a single TTS instance — avoids re-init overhead on every turn
-        self._tts = sarvam.TTS(
-            target_language_code=TTS_LANGUAGE,
-            model="bulbul:v3-beta",
-            speaker="ritu",
-            # ✅ Lowered buffer: starts speaking sooner (was 30)
-            min_buffer_size=10,
-        )
 
     async def on_enter(self) -> None:
         await self.session.say(OPENING_MESSAGE)
@@ -147,29 +139,40 @@ class MiaAgent(Agent):
 
     async def tts_node(self, text: AsyncIterable[str], model_settings: ModelSettings):
         """
-        ✅ FIX: Stream LLM chunks directly into TTS instead of buffering the
-        full response first. This cuts first-audio latency from ~40s down to
-        just LLM-time-to-first-token + TTS processing of the first sentence.
+        ✅ STREAMING FIX: Push LLM chunks into TTS as they arrive instead of
+        buffering the full response. Cuts latency from ~40s to ~3-5s.
+
+        ✅ INSTANCE FIX: Create a fresh sarvam.TTS per turn — Sarvam's client
+        does not support calling .stream() multiple times on the same instance.
+        Reusing the instance caused silent failures (no audio output at all).
         """
-        async with self._tts.stream() as stream:
+        # Fresh instance every turn — required for Sarvam TTS correctness
+        tts = sarvam.TTS(
+            target_language_code=TTS_LANGUAGE,
+            model="bulbul:v3-beta",
+            speaker="ritu",
+            min_buffer_size=10,  # lower = starts speaking sooner
+        )
+
+        async with tts.stream() as stream:
 
             async def push_chunks():
-                """Feed cleaned LLM chunks into the TTS stream as they arrive."""
                 async for chunk in text:
                     clean = clean_for_tts(chunk)
                     if clean:
                         stream.push_text(clean)
                 stream.end_input()
 
-            # Push and consume in parallel so audio starts as soon as
-            # the TTS has buffered enough — no waiting for full LLM output.
+            # Push and consume in parallel — audio starts after first sentence,
+            # not after the full LLM response is done.
             push_task = asyncio.create_task(push_chunks())
 
-            async for ev in stream:
-                yield ev.frame
-
-            # Ensure the push coroutine is fully done before exiting
-            await push_task
+            try:
+                async for ev in stream:
+                    yield ev.frame
+            finally:
+                # Always await the push task so exceptions surface cleanly
+                await push_task
 
 
 async def entrypoint(ctx: JobContext):
