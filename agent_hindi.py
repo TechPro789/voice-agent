@@ -22,6 +22,9 @@ STT_LANGUAGE = "hi-IN"
 TTS_LANGUAGE = "hi-IN"
 AGENT_NAME   = "hindi-agent"
 
+# Sentence boundary punctuation for Hindi (।) and Latin (.!?)
+SENTENCE_END = re.compile(r'[।.!?]+')
+
 # ── Strip emojis and symbols Sarvam TTS cannot handle ─────────────────────────
 def clean_for_tts(text: str) -> str:
     text = re.sub(r'[^\u0000-\u007F\u0900-\u097F\s।,।!?.\-₹%]', '', text)
@@ -78,6 +81,7 @@ class RAGRetriever:
         self.qdrant = QdrantClient(
             url=os.getenv("QDRANT_URL", "http://localhost:6333"),
             api_key=os.getenv("QDRANT_API_KEY"),
+            check_version=False,  # suppress version mismatch warning
         )
         self._client = None
 
@@ -139,39 +143,64 @@ class MiaAgent(Agent):
 
     async def tts_node(self, text: AsyncIterable[str], model_settings: ModelSettings):
         """
-        ✅ STREAMING FIX: Push LLM chunks into TTS as they arrive instead of
-        buffering the full response. Cuts latency from ~40s to ~3-5s.
+        SENTENCE-BOUNDARY STREAMING — fixes broken accent / foreign-sounding Hindi.
 
-        ✅ INSTANCE FIX: Create a fresh sarvam.TTS per turn — Sarvam's client
-        does not support calling .stream() multiple times on the same instance.
-        Reusing the instance caused silent failures (no audio output at all).
+        ROOT CAUSE of accent issue:
+          Pushing raw LLM token fragments ("Aap", " ke", " liye"...) to Sarvam TTS
+          causes it to synthesize each tiny fragment without sentence context.
+          Sarvam's prosody model needs a full sentence to apply correct Hindi
+          intonation, stress, and rhythm — fragments produce robotic/foreign output.
+
+        FIX:
+          Buffer incoming tokens until a sentence-ending punctuation mark is found
+          (। . ! ?), then push the complete sentence to TTS. This gives Sarvam the
+          full phonetic context it needs while still streaming sentence-by-sentence
+          (audio starts after the first sentence, not the full LLM response).
+
+        Fresh TTS instance per turn — Sarvam does not support reusing
+          the same instance across multiple .stream() calls.
         """
-        # Fresh instance every turn — required for Sarvam TTS correctness
         tts = sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
             model="bulbul:v3-beta",
             speaker="ritu",
-            min_buffer_size=30,  # lower = starts speaking sooner
+            min_buffer_size=30,
         )
 
         async with tts.stream() as stream:
 
-            async def push_chunks():
+            async def push_sentences():
+                buffer = ""
                 async for chunk in text:
                     clean = clean_for_tts(chunk)
-                    if clean:
-                        stream.push_text(clean)
+                    if not clean:
+                        continue
+                    buffer += clean
+
+                    # Flush every complete sentence to TTS immediately
+                    while True:
+                        match = SENTENCE_END.search(buffer)
+                        if not match:
+                            break
+                        sentence = buffer[:match.end()].strip()
+                        buffer   = buffer[match.end():].strip()
+                        if sentence:
+                            logger.info(f"TTS > {sentence[:80]}")
+                            stream.push_text(sentence + " ")
+
+                # Flush any trailing text (last fragment without punctuation)
+                if buffer.strip():
+                    logger.info(f"TTS > (remainder) {buffer[:80]}")
+                    stream.push_text(buffer.strip())
+
                 stream.end_input()
 
-            # Push and consume in parallel — audio starts after first sentence,
-            # not after the full LLM response is done.
-            push_task = asyncio.create_task(push_chunks())
+            push_task = asyncio.create_task(push_sentences())
 
             try:
                 async for ev in stream:
                     yield ev.frame
             finally:
-                # Always await the push task so exceptions surface cleanly
                 await push_task
 
 
@@ -192,8 +221,6 @@ async def entrypoint(ctx: JobContext):
             mode="transcribe",
         ),
         llm=openai.LLM(model="gpt-4o", temperature=0.7),
-        # ✅ Session-level TTS is still needed by AgentSession internally;
-        #    MiaAgent.tts_node overrides actual audio output with its own instance.
         tts=sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
             model="bulbul:v3-beta",
