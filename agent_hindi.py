@@ -153,7 +153,7 @@ class MiaAgent(Agent):
         tts = sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
             model="bulbul:v3-beta",
-            speaker="meera",
+            speaker="priya",
             min_buffer_size=30,
         )
 
@@ -213,7 +213,7 @@ async def entrypoint(ctx: JobContext):
         tts=sarvam.TTS(
             target_language_code=TTS_LANGUAGE,
             model="bulbul:v3-beta",
-            speaker="meera",
+            speaker="priya",
             min_buffer_size=30,
         ),
     )
